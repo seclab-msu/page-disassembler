@@ -1,0 +1,78 @@
+{
+  "title": "webpack-jsonp-bundle",
+  "type": "ast",
+  "desc": "",
+  "checks": [
+    {
+      "type": "CallExpression",
+
+      "callee": {
+        "type": "MemberExpression",
+
+        "object": {
+          "type": "AssignmentExpression",
+
+          "operator": "=",
+          "left": {
+            "type": "MemberExpression",
+
+            "object": {
+              "$in": [{ "type": "ThisExpression" }, { "type": "Identifier" }]
+            },
+            "property": {
+              "$in": [{"type": "Identifier"}, {"type": "StringLiteral"}]
+            }
+          },
+          "right": {
+            "type": "LogicalExpression",
+
+            "left": {
+              "type": "MemberExpression",
+
+              "object": {
+                "$in": [{ "type": "ThisExpression" }, { "type": "Identifier" }]
+              },
+              "property": {
+                "$in": [{"type": "Identifier"}, {"type": "StringLiteral"}]
+              }
+            },
+            "operator": "||",
+            "right": {
+              "type": "ArrayExpression",
+
+              "elements": []
+            }
+          }
+        },
+        "property": {
+          "type": "Identifier",
+
+          "name": "push"
+        }
+      },
+      "arguments": [
+        {
+          "type": "ArrayExpression",
+
+          "elements": {
+            "$values": [
+              {
+                "type": "ArrayExpression"
+              },
+              {
+                "type": { "$in": ["ObjectExpression", "ArrayExpression"] }
+              }
+            ]
+          }
+        }
+      ],
+      "$break": true
+    }
+  ],
+  "$depth": 0,
+  "$length": 0,
+  "output": {
+    "code": "{$0}",
+    "message": "resource.tagged.axios-lib-sign"
+  }
+}

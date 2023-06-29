@@ -1,0 +1,60 @@
+{
+  "title": "webpack-jsonp-func-bundle",
+  "type": "ast",
+  "desc": "",
+  "checks": [
+    {
+    "type": "Program",
+    "body": [
+      {
+        "$in": [
+          {
+            "type": "ExpressionStatement",
+            "expression": {
+              "type": "CallExpression",
+              "callee": {
+                "type": "Identifier",
+                "name": {"$wildcard": "webpackJsonp*"}
+              },
+              "arguments": [
+                {
+                  "type": "ArrayExpression"
+                },
+                {
+                  "type": { "$in": ["ObjectExpression", "ArrayExpression"] }
+                }
+              ]
+            }
+          },
+          {
+            "type": "VariableDeclaration",
+            "declarations": [{
+              "type": "VariableDeclarator",
+              "init": {
+                "type": "CallExpression",
+                "callee": {
+                  "name": {"$wildcard": "webpackJsonp*"}
+                },
+                "arguments": [
+                  {
+                    "type": "ArrayExpression"
+                  },
+                  {
+                    "type": { "$in": ["ObjectExpression", "ArrayExpression"] }
+                  }
+                ]
+              }
+            }]
+          }
+        ]
+      }],
+      "$break": true
+    }
+  ],
+  "$depth": 0,
+  "$length": 0,
+  "output": {
+    "code": "{$0}",
+    "message": "resource.tagged.axios-lib-sign"
+  }
+}

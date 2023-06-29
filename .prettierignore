@@ -1,0 +1,8 @@
+bundler-signatures/
+test/test-data/
+
+src/*.js
+src/**/*.js
+
+!src/utils/read-tar.js
+!src/lib-detection/lib-detection.js

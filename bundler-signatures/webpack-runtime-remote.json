@@ -1,0 +1,252 @@
+{
+  "title": "webpack-runtime-remote-bundle",
+  "type": "ast",
+  "desc": "",
+  "checks": [
+    {
+      "type": "CallExpression",
+      "callee": {
+        "type": "FunctionExpression",
+        "generator": false,
+        "async": false,
+        "body": {
+          "type": "BlockStatement",
+          "body": {"$values": [
+            {
+              "type": "FunctionDeclaration",
+              "id": {
+                "type": "Identifier"
+              },
+              "generator": false,
+              "async": false,
+              "params": [
+                {
+                  "type": "Identifier"
+                }
+              ],
+              "body": {
+                "type": "BlockStatement",
+                "body": {"$values": [
+                  {
+                    "type": "IfStatement",
+                    "test": {
+                      "type": "BinaryExpression",
+                      "operator": "!=="
+                    },
+                    "consequent": {
+                      "type": "ReturnStatement",
+                      "argument": {
+                        "type": "MemberExpression",
+                        "object": {
+                          "type": "Identifier"
+                        },
+                        "property": {
+                          "type": "Identifier",
+                          "name": "exports"
+                        }
+                      }
+                    },
+                    "alternate": null
+                  },
+                  {
+                    "type": "VariableDeclaration",
+                    "declarations": {"$values": [
+                      {
+                        "type": "VariableDeclarator",
+                        "id": {
+                          "type": "Identifier"
+                        },
+                        "init": {
+                          "type": "AssignmentExpression",
+                          "operator": "=",
+                          "left": {
+                            "type": "MemberExpression",
+                            "object": {
+                              "type": "Identifier"
+                            },
+                            "property": {
+                              "type": "Identifier"
+                            }
+                          },
+                          "right": {
+                            "type": "ObjectExpression",
+                            "properties": {"$values": [
+                              {
+                                "type": "ObjectProperty",
+                                "key": {
+                                  "type": "Identifier"
+                                },
+                                "value": {
+                                  "type": "Identifier"
+                                }
+                              },
+                              {
+                                "type": "ObjectProperty",
+                                "key": {
+                                  "type": "Identifier",
+                                  "name": "loaded"
+                                }
+                              },
+                              {
+                                "type": "ObjectProperty",
+                                "key": {
+                                  "type": "Identifier",
+                                  "name": "exports"
+                                },
+                                "value": {
+                                  "type": "ObjectExpression"
+                                }
+                              }
+                            ]}
+                          }
+                        }
+                      }
+                    ]},
+                    "kind": "var"
+                  },
+                  {
+                    "type": "TryStatement",
+                    "block": {
+                      "type": "BlockStatement",
+                      "body": [
+                        {
+                          "type": "ExpressionStatement",
+                          "expression": {
+                            "type": "SequenceExpression",
+                            "expressions": {"$values": [
+                              {
+                                "type": "CallExpression",
+                                "callee": {
+                                  "type": "MemberExpression",
+                                  "object": {
+                                    "type": "MemberExpression",
+                                    "object": {
+                                      "type": "Identifier"
+                                    },
+                                    "property": {
+                                      "type": "Identifier"
+                                    }
+                                  },
+                                  "property": {
+                                    "type": "Identifier",
+                                    "name": "call"
+                                  }
+                                },
+                                "arguments": {"$values": [
+                                  {
+                                    "type": "MemberExpression",
+                                    "object": {
+                                      "type": "Identifier"
+                                    },
+                                    "property": {
+                                      "type": "Identifier",
+                                      "name": "exports"
+                                    }
+                                  },
+                                  {
+                                    "type": "Identifier"
+                                  },
+                                  {
+                                    "type": "MemberExpression",
+                                    "object": {
+                                      "type": "Identifier"
+                                    },
+                                    "property": {
+                                      "type": "Identifier",
+                                      "name": "exports"
+                                    }
+                                  },
+                                  {
+                                    "type": "Identifier"
+                                  }
+                                ]}
+                              },
+                              {
+                                "type": "AssignmentExpression",
+                                "operator": "=",
+                                "left": {
+                                  "type": "Identifier"
+                                },
+                                "right": {
+                                  "type": "UnaryExpression"
+                                }
+                              }
+                            ]}
+                          }
+                        }
+                      ]
+                    },
+                    "finalizer": {
+                      "type": "BlockStatement",
+                      "body": [
+                        {
+                          "type": "ExpressionStatement",
+                          "expression": {
+                            "type": "LogicalExpression",
+                            "operator": "&&",
+                            "right": {
+                              "type": "UnaryExpression",
+                              "argument": {
+                                "type": "MemberExpression",
+                                "object": {
+                                  "type": "Identifier"
+                                },
+                                "property": {
+                                  "type": "Identifier"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "ReturnStatement",
+                    "argument": {
+                      "type": "SequenceExpression",
+                      "expressions": {"$values": [
+                        {
+                          "type": "AssignmentExpression",
+                          "operator": "=",
+                          "left": {
+                            "type": "MemberExpression",
+                            "object": {
+                              "type": "Identifier"
+                            },
+                            "property": {
+                              "type": "Identifier",
+                              "name": "loaded"
+                            }
+                          }
+                        },
+                        {
+                          "type": "MemberExpression",
+                          "object": {
+                            "type": "Identifier"
+                          },
+                          "property": {
+                            "type": "Identifier",
+                            "name": "exports"
+                          }
+                        }
+                      ]}
+                    }
+                  }
+                ]}
+              }
+            }
+          ]}
+        }
+      },
+      "arguments": [],
+      "$bkeak": true
+    }
+  ],
+  "$depth": 0,
+  "$length": 0,
+  "output": {
+    "code": "{$0}",
+    "message": "resource.tagged.jquery-lib-sign"
+  }
+}

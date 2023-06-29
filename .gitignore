@@ -1,0 +1,9 @@
+node_modules/
+results/
+
+**/*.js
+*.js
+!test/test-data/single-bundles/**/*.js
+
+!src/lib-detection/lib-detection.js
+!src/utils/read-tar.js

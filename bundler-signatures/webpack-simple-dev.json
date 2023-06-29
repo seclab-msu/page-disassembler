@@ -1,0 +1,130 @@
+{
+  "title": "webpack-simple-dev-bundle",
+  "type": "ast",
+  "desc": "",
+  "checks": [
+    {
+      "type": "BlockStatement",
+      "body": {
+        "$values": [
+          {
+            "type": "VariableDeclaration",
+            "declarations": [
+              {
+                "type": "VariableDeclarator",
+                "id": {
+                  "type": "Identifier",
+                  "name": "__webpack_modules__"
+                },
+                "init": {
+                  "type": "ObjectExpression"
+                }
+              }
+            ],
+            "kind": "var"
+          },
+          {
+            "type": "FunctionDeclaration",
+            "id": {
+              "type": "Identifier",
+              "name": "__webpack_require__"
+            },
+            "body": {
+              "type": "BlockStatement",
+              "body": {
+                "$values": [
+                  {
+                    "type": "IfStatement",
+                    "consequent": {
+                      "type": "BlockStatement",
+                      "body": {
+                        "$values": [
+                          {
+                            "type": "ReturnStatement",
+                            "argument": {
+                              "type": "MemberExpression",
+                              "property": {
+                                "type": "Identifier",
+                                "name": "exports"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "alternate": null
+                  },
+                  {
+                    "type": "VariableDeclaration",
+                    "declarations": [
+                      {
+                        "type": "VariableDeclarator",
+                        "id": {
+                          "type": "Identifier",
+                          "name": "module"
+                        },
+                        "init": {
+                          "type": "AssignmentExpression",
+                          "operator": "=",
+                          "left": {
+                            "type": "MemberExpression",
+                            "object": {
+                              "type": "Identifier",
+                              "name": "__webpack_module_cache__"
+                            },
+                            "property": {
+                              "type": "Identifier"
+                            }
+                          },
+                          "right": {
+                            "type": "ObjectExpression",
+                            "properties": {
+                              "$values": [
+                                {
+                                  "type": "ObjectProperty",
+                                  "key": {
+                                    "type": "Identifier",
+                                    "name": "exports"
+                                  },
+                                  "value": {
+                                    "type": "ObjectExpression"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "kind": "var"
+                  },
+                  {
+                    "type": "ReturnStatement",
+                    "argument": {
+                      "type": "MemberExpression",
+                      "object": {
+                        "type": "Identifier",
+                        "name": "module"
+                      },
+                      "property": {
+                        "type": "Identifier",
+                        "name": "exports"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "directives": []
+    }
+  ],
+  "$depth": 0,
+  "$length": 0,
+  "output": {
+    "code": "{$0}",
+    "message": "resource.tagged.axios-lib-sign"
+  }
+}

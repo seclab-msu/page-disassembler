@@ -1,0 +1,44 @@
+{
+    "name": "page-disassembler",
+    "version": "0.1.0",
+    "description": "A tool for detecting and debundling JavaScript module bundlers",
+    "author": "Denis Mironov <mirond@seclab.cs.msu.ru>, Daniil Sigalov <asterite@seclab.cs.msu.ru>",
+    "repository": "https://github.com/seclab-msu/page-disassembler",
+    "engines": {
+        "node": ">=17.0.1"
+    },
+    "bin": "bin.js",
+    "main": "index.js",
+    "scripts": {
+        "build": "tsc",
+        "prepare": "npm run build",
+        "test": "mocha test/*.spec.js --timeout 300000",
+        "lint:prettier": "prettier -c .",
+        "fix:prettier": "prettier --write .",
+        "clean": "rm bin.js index.js src/debundler/boundaries.js src/debundler/debundler-fs.js src/debundler/debundler.js src/utils/common.js src/utils/logging.js src/utils/page-parser.js test/debundler.spec.js"
+    },
+    "dependencies": {
+        "@babel/parser": "^7.20.5",
+        "@babel/traverse": "^7.17.0",
+        "argparse": "^2.0.1",
+        "htmlparser2": "^7.2.0",
+        "js-ast-matcher": "^1.1.0",
+        "tar-stream": "^2.2.0"
+    },
+    "devDependencies": {
+        "@types/argparse": "^2.0.10",
+        "@types/babel__generator": "^7.6.4",
+        "@types/babel__traverse": "^7.18.3",
+        "@types/chai": "^4.3.4",
+        "@types/mocha": "^10.0.1",
+        "@types/node": "^18.11.11",
+        "chai": "^4.3.6",
+        "mocha": "^9.2.2",
+        "prettier": "^2.8.8",
+        "typescript": "^4.9.4"
+    },
+    "prettier": {
+        "tabWidth": 4,
+        "bracketSpacing": false
+    }
+}

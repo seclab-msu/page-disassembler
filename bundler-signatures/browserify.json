@@ -1,0 +1,128 @@
+{
+  "title": "broserify-bundle",
+  "type": "ast",
+  "desc": "",
+  "checks": [
+    {
+      "type": "CallExpression",
+      "callee": {
+        "$in": [
+          {
+            "type": "FunctionExpression",
+            "generator": false,
+            "async": false,
+            "body": {
+              "type": "BlockStatement",
+              "body": {
+                "$values": [
+                  {
+                    "type": "FunctionDeclaration",
+                    "generator": false,
+                    "async": false,
+                    "body": {
+                      "type": "BlockStatement",
+                      "body": [
+                        {
+                          "type": "IfStatement",
+                          "alternate": null
+                        },
+                        {
+                          "type": "ReturnStatement",
+                          "argument": {
+                            "type": "MemberExpression",
+                            "object": {
+                              "type": "MemberExpression"
+                            },
+                            "property": {
+                              "type": "Identifier",
+                              "name": "exports"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "ReturnStatement"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "FunctionExpression",
+              "body": {
+                "type": "BlockStatement",
+                "body": [
+                  {
+                    "type": "FunctionDeclaration",
+                    "body": {
+                      "type": "BlockStatement",
+                      "body": {
+                        "$values": [
+                          {
+                            "type": "FunctionDeclaration",
+                            "body": {
+                              "type": "BlockStatement",
+                              "body": {
+                                "$values": [
+                                  {
+                                    "type": "IfStatement",
+                                    "alternate": null
+                                  },
+                                  {
+                                    "type": "ReturnStatement",
+                                    "argument": {
+                                      "type": "MemberExpression",
+                                      "object": {
+                                        "type": "MemberExpression"
+                                      },
+                                      "property": {
+                                        "type": "Identifier",
+                                        "name": "exports"
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "ReturnStatement"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "ReturnStatement"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "arguments": [
+        {
+          "type": "ObjectExpression"
+        },
+        {
+          "type": "ObjectExpression"
+        },
+        {
+          "type": "ArrayExpression"
+        }
+      ],
+      "$break": true
+    }
+  ],
+  "$depth": 0,
+  "$length": 0,
+  "output": {
+    "code": "{$0}",
+    "message": "resource.tagged.jquery-lib-sign"
+  }
+}
