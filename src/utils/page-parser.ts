@@ -1,6 +1,6 @@
-import * as htmlparser from "htmlparser2";
+import * as htmlparser from 'htmlparser2';
 
-import {hasattr} from "./common";
+import { hasattr } from '../utils/common';
 
 export function getPageScripts(pageHTML: any) {
     const handler = {
@@ -12,7 +12,7 @@ export function getPageScripts(pageHTML: any) {
                 this.currentScript = [];
             } else {
                 for (const attr of Object.keys(attributes)) {
-                    if (hasattr(attributes, attr) && attr.startsWith("on")) {
+                    if (hasattr(attributes, attr) && attr.startsWith('on')) {
                         // @ts-ignore
                         this.scripts.push(attributes[attr]);
                     }
@@ -29,10 +29,10 @@ export function getPageScripts(pageHTML: any) {
             // @ts-ignore
             if (tagname === "script" && this.currentScript.length > 0) {
                 // @ts-ignore
-                this.scripts.push(this.currentScript.join(""));
+                this.scripts.push(this.currentScript.join(''));
                 this.currentScript = null;
             }
-        },
+        }
     };
 
     const pageParser = new htmlparser.Parser(handler);

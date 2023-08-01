@@ -1,38 +1,46 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 
-import traverse from "@babel/traverse";
-import generate from "@babel/generator";
+import { NodePath } from '@babel/traverse';
+import generate from '@babel/generator';
 import {
     Node,
-    isLiteral,
     Expression,
-    isFunction,
-    nullLiteral,
     SpreadElement,
     ObjectProperty,
-    program,
-    Program,
-} from "@babel/types";
-import {parse, ParserOptions} from "@babel/parser";
+    Statement,
+    File,
 
-import {log} from "../utils/logging";
-import {hasattr, PARSE_OPTIONS} from "../utils/common";
-import {Boundaries, BundleInfo} from "./boundaries";
+    callExpression,
+    functionExpression,
+    blockStatement,
+    expressionStatement,
+    identifier,
+    variableDeclaration,
+    nullLiteral,
+    variableDeclarator,
+    file,
+    program as makeProgram,
 
-import * as matcher from "js-ast-matcher";
+    VISITOR_KEYS
+} from '@babel/types';
+import { parse } from '@babel/parser';
+
+import { log } from '../utils/logging';
+import { hasattr } from '../utils/common';
+import { Boundaries, BundleInfo } from './boundaries';
+
+import { renameRequireInNodePath, renameRequireInAST } from './rename-require';
+
+import * as matcher from 'js-ast-matcher';
 
 interface DebundlerResult {
-    modules: Map<string, string>;
+    modules: Map<string, Node>;
+    nameToBundleClass: Map<string, string>;
     curBundleClass: string;
 }
 
-export const DEFAULT_SIGNATURE_PATH = path.join(
-    __dirname,
-    "..",
-    "..",
-    "bundler-signatures"
-);
+export const DEFAULT_SIGNATURE_PATH = path.join(__dirname, '..', '..', 'bundler-signatures');
 
 // moduleCallback function receive a module's name and the module
 // as arguments. moduleCallback can transform the code of the module.
@@ -42,21 +50,22 @@ export const DEFAULT_SIGNATURE_PATH = path.join(
 type moduleCallback = (name: string, module: string) => string | null;
 
 export class Debundler {
-    private bundleSignatures: ReturnType<JSON["parse"]>[];
-    private baseAST!: Node;
+    private bundleSignatures: ReturnType<JSON['parse']>[];
+    private baseAST?: Node;
     private astMatcher: matcher.ASTPatternMatcher;
     protected result: DebundlerResult;
-    private parserOpts: ParserOptions;
     protected verbose: boolean;
 
     constructor(
         debundleSignaturesPath: string = DEFAULT_SIGNATURE_PATH,
-        parserOpts: ParserOptions = PARSE_OPTIONS
     ) {
         this.bundleSignatures = [];
         this.verbose = false;
-        this.result = {modules: new Map<string, string>(), curBundleClass: ""};
-        this.parserOpts = parserOpts;
+        this.result = {
+            modules: new Map<string, Node>(),
+            curBundleClass: '',
+            nameToBundleClass: new Map<string, string>()
+        };
         this.astMatcher = new matcher.ASTPatternMatcher();
         this.loadSignatures(debundleSignaturesPath);
     }
@@ -68,462 +77,375 @@ export class Debundler {
     private loadSignatures(debundleSignaturesPath: string): void {
         const stats = fs.lstatSync(debundleSignaturesPath);
         if (stats.isDirectory()) {
-            this.bundleSignatures = fs
-                .readdirSync(debundleSignaturesPath)
-                .map((file: string) =>
-                    JSON.parse(
-                        fs
-                            .readFileSync(
-                                path.join(debundleSignaturesPath, file)
-                            )
-                            .toString()
-                    )
-                );
+            this.bundleSignatures = fs.readdirSync(debundleSignaturesPath).map(
+                (file: string) => JSON.parse(fs.readFileSync(path.join(debundleSignaturesPath, file)).toString())
+            );
         } else if (stats.isFile()) {
             this.bundleSignatures.push(
                 JSON.parse(fs.readFileSync(debundleSignaturesPath).toString())
             );
         } else {
-            throw new Error(debundleSignaturesPath + " not file and not dir");
+            throw new Error(debundleSignaturesPath + ' not file and not dir');
         }
     }
 
-    private addModule(name: string, content: string): void {
+    private addModule(name: string, content: Node | null): void {
+        if (content === null) {
+            return;
+        }
         this.result.modules.set(name, content);
     }
 
-    private getModuleName(module: any): string {
-        let moduleName: string = "";
+    private makeFile(body: Statement[]): File {
+        return file(makeProgram(body));
+    }
 
-        if (
-            hasattr(module.key, "value") &&
-            typeof module.key.value !== "undefined" &&
-            module.key.value !== null
-        ) {
+    private getModuleName(module: any): string {
+        let moduleName: string = '';
+
+        if (hasattr(module.key, 'value') && typeof module.key.value !== 'undefined' && module.key.value !== null) {
             moduleName = module.key.value.toString();
-        } else if (
-            hasattr(module.key, "name") &&
-            typeof module.key.name !== "undefined" &&
-            module.key.name !== null
-        ) {
+        } else if (hasattr(module.key, 'name') && typeof module.key.name !== 'undefined' && module.key.name !== null) {
             moduleName = module.key.name.toString();
         }
 
         return moduleName;
-    }
+    };
 
-    private renameRequire(ast: any, bundleClass: string) {
-        if (ast === null) {
+    public static renameRequire(ast: any, bundleClass: string, verbose=false, path?: NodePath) {
+        if (ast === null && typeof path === 'undefined') {
             return null;
         }
-        if (!isFunction(ast)) {
-            if (isLiteral(ast)) {
-                const node = JSON.stringify(ast, (k, v) => {
-                    if (k !== "_parent") {
-                        return v;
+
+        let names = ['module', 'exports', 'require'];
+        if (bundleClass.startsWith('browserify')) {
+            names = ['require', 'module', 'exports'];
+        }
+
+        if (typeof path !== 'undefined') {
+            return renameRequireInNodePath(path, names);
+        } else {
+            return renameRequireInAST(ast, names, verbose);
+        }
+    };
+
+    private wrapFuncWithReturnInIIFE(ast: any, start: number, end: number) {
+        for (const node of ast.program.body) {
+            if (node.type === 'ReturnStatement') {
+                // if met return at top level then wrap it inside IIFE
+                // !function(){...body}()
+                ast.program.body = [{
+                    type: 'ExpressionStatement',
+                    expression: {
+                        type: 'UnaryExpression',
+                        argument: {
+                            type: 'CallExpression',
+                            callee: {
+                                type: 'FunctionExpression',
+                                body: {
+                                    type: 'BlockStatement',
+                                    body: ast.program.body,
+                                    directives: [],
+                                    end: end,
+                                    start: start
+                                },
+                                params: [],
+                                generator: false,
+                                async: false,
+                                end: end,
+                                start: start
+                            },
+                            arguments: []
+                        },
+                        operator: '!',
+                        prefix: true,
+                        end: end,
+                        start: start
                     }
-                });
-                if (this.verbose) {
-                    log(
-                        `warning: literal detected ${node} while renaming require in ${bundleClass}`
-                    );
-                }
-            } else if (this.verbose) {
-                log(
-                    `warning: ${ast.type} detected while renaming require in ${bundleClass}`
-                );
+                }]
             }
-            return ast;
         }
-        let names = ["module", "exports", "require"];
-        if (bundleClass.startsWith("broserify")) {
-            names = ["require", "module", "exports"];
-        }
-        const p = {
-            type: "File",
-            program: {
-                type: "Program",
-                body: [ast],
-                sourceType: "script",
-            },
-        };
-        // @ts-ignore
-        traverse(p, {
-            Function(path: any) {
-                const node = path.node;
-                if (node !== ast) {
-                    throw new Error(
-                        "Expected the first met function to be module ast"
-                    );
-                }
-                for (
-                    let i = 0;
-                    i < Math.min(names.length, node.params.length);
-                    i++
-                ) {
-                    let param = node.params[i];
-                    if (param.type !== "Identifier") {
-                        log(
-                            "Warning: module function param is not an Identifier, it is " +
-                                param.type
-                        );
-                        break;
-                    }
-                    path.scope.rename(param.name, names[i]);
-                }
-                path.stop();
-            },
-        });
-        return {
-            type: "File",
-            program: {
-                type: "Program",
-                // @ts-ignore
-                body: p.program.body[0].body.body,
-                sourceType: "script",
-            },
-        };
     }
 
     private generateModulesFromObjectProperties(
         modules: Array<ObjectProperty>,
         bundleClass: string
     ): void {
-        if (typeof modules === "undefined") {
+        if (typeof modules === 'undefined') {
             return;
         }
         for (const module of modules) {
             const moduleName = this.getModuleName(module);
-            let renamedAST = this.renameRequire(module.value, bundleClass);
-            const content = generate(renamedAST);
-            this.addModule(moduleName, content.code);
+            this.addModule(moduleName, module.value);
+            this.result.nameToBundleClass.set(moduleName, bundleClass);
         }
-    }
+    };
 
     private generateModulesFromArrayElements(
         modules: Array<null | Expression | SpreadElement>,
         bundleClass: string
     ): void {
         if (!modules) {
-            return;
+            return
         }
 
         for (let i = 0; i < modules.length; i++) {
-            if (modules[i] === null) {
+            if (modules[i] === null || modules[i]?.type === 'NumericLiteral') {
                 continue;
             }
-            let renamedAST = this.renameRequire(modules[i], bundleClass);
-            const content = generate(renamedAST);
-            this.addModule(i.toString(), content.code);
+            this.addModule(i.toString(), modules[i]);
+            this.result.nameToBundleClass.set(i.toString(), bundleClass);
         }
-    }
+    };
 
     private debundleBrowserify(ast: any): void {
+        // TODO: add __runtime
         const modules = ast.arguments[0].properties;
         for (const module of modules) {
             const moduleName = this.getModuleName(module);
             let ast: any;
-            if (module.value.type === "ArrayExpression") {
+            if (module.value.type === 'ArrayExpression') {
                 ast = module.value.elements[0];
             } else {
                 ast = module.value;
             }
-            let renamedAST = this.renameRequire(ast, "broserify-bundle");
-            this.addModule(moduleName, generate(renamedAST).code);
+            this.addModule(moduleName, ast);
+            this.result.nameToBundleClass.set(moduleName, 'browserify-bundle');
         }
     }
 
     private debundleWebpackRuntime(ast: any): void {
-        let runtimeAST = {
-            type: "FunctionDeclaration",
-            params: [],
-            id: {
-                type: "Identifier",
-                name: "__runtime",
-            },
-            body: ast.callee.body,
-        };
-        // @ts-ignore
-        const runtimeContent = generate(runtimeAST);
-        this.addModule("__runtime", runtimeContent.code);
-        if (ast.arguments[0].type === "ObjectExpression") {
+        const runtimeAST = this.makeFile(ast.callee.body.body);
+        this.wrapFuncWithReturnInIIFE(runtimeAST, ast.callee.body.start, ast.callee.body.end);
+        this.addModule('__runtime', runtimeAST);
+        if (ast.arguments[0].type === 'ObjectExpression') {
             const modules = ast.arguments[0].properties;
-            this.generateModulesFromObjectProperties(
-                modules,
-                "webpack-runtime-bundle"
-            );
-        } else if (ast.arguments[0].type === "ArrayExpression") {
+            this.generateModulesFromObjectProperties(modules, 'webpack-runtime-bundle');
+        } else if (ast.arguments[0].type === 'ArrayExpression') {
             const modules = ast.arguments[0].elements;
-            this.generateModulesFromArrayElements(
-                modules,
-                "webpack-runtime-bundle"
-            );
+            this.generateModulesFromArrayElements(modules, 'webpack-runtime-bundle');
         }
-    }
+    };
 
     private debundleJsonp(ast: any): void {
-        if (ast.arguments[0].elements[1].type === "ObjectExpression") {
+        if (ast.arguments[0].elements[1].type === 'ObjectExpression') {
             const modules = ast.arguments[0].elements[1].properties;
-            this.generateModulesFromObjectProperties(
-                modules,
-                "webpack-jsonp-bundle"
-            );
-        } else if (ast.arguments[0].elements[1].type === "ArrayExpression") {
+            this.generateModulesFromObjectProperties(modules, 'webpack-jsonp-bundle');
+        } else if (ast.arguments[0].elements[1].type === 'ArrayExpression') {
             let modules = new Array();
-            if (ast.arguments[0].elements[1].type === "ArrayExpression") {
+            if (ast.arguments[0].elements[1].type === 'ArrayExpression') {
                 modules = ast.arguments[0].elements[1].elements;
             } else {
                 modules = ast.arguments[0].elements[1].elements[0];
             }
-            this.generateModulesFromArrayElements(
-                modules,
-                "webpack-jsonp-bundle"
-            );
+            this.generateModulesFromArrayElements(modules, 'webpack-jsonp-bundle');
         }
-    }
+    };
 
     private debundleJsonpFunc(ast: any): void {
         if (
-            ast.type === "Program" &&
-            ast.body[0].type === "VariableDeclaration" &&
-            ast.body[0].declarations[0].init.type === "CallExpression" &&
-            ast.body[0].declarations[0].init.arguments.length === 3
+            ast.type === 'VariableDeclaration' &&
+            ast.declarations[0].init.type === 'CallExpression' &&
+            ast.declarations[0].init.arguments.length === 3
         ) {
-            const modules = ast.body[0].declarations[0].init.arguments[1];
-            if (modules.type === "ObjectExpression") {
-                this.generateModulesFromObjectProperties(
-                    modules.properties,
-                    "webpack-jsonp-func-bundle"
-                );
-            } else if (modules.type === "ArrayExpression") {
-                this.generateModulesFromArrayElements(
-                    modules.elements,
-                    "webpack-jsonp-func-bundle"
-                );
+            const modules = ast.declarations[0].init.arguments[1];
+            if (modules.type === 'ObjectExpression') {
+                this.generateModulesFromObjectProperties(modules.properties, 'webpack-jsonp-func-bundle');
+            } else if (modules.type === 'ArrayExpression') {
+                this.generateModulesFromArrayElements(modules.elements, 'webpack-jsonp-func-bundle');
             }
         } else if (ast.expression && ast.expression.arguments[1]) {
             const modules = ast.expression.arguments[1];
-            if (modules.type === "ArrayExpression") {
-                this.generateModulesFromArrayElements(
-                    modules.elements,
-                    "webpack-jsonp-func-bundle"
-                );
-            } else if (modules.type === "ObjectExpression") {
-                this.generateModulesFromObjectProperties(
-                    modules.properties,
-                    "webpack-jsonp-func-bundle"
-                );
+            if (modules.type === 'ArrayExpression') {
+                this.generateModulesFromArrayElements(modules.elements, 'webpack-jsonp-func-bundle');
+            } else if (modules.type === 'ObjectExpression') {
+                this.generateModulesFromObjectProperties(modules.properties, 'webpack-jsonp-func-bundle');
             }
         }
-    }
+    };
 
     private debundleWebpackSimple(ast: any): void {
         for (const declaration of ast.callee.body.body[0].declarations) {
             if (declaration.init) {
-                if (
-                    declaration.init.type === "ArrayExpression" &&
-                    declaration.init.elements.length !== 0
-                ) {
-                    this.generateModulesFromArrayElements(
-                        declaration.init.elements,
-                        "webpack-simple-bundle"
-                    );
-                } else if (
-                    declaration.init.type === "ObjectExpression" &&
-                    declaration.init.properties.length !== 0
-                ) {
-                    this.generateModulesFromObjectProperties(
-                        declaration.init.properties,
-                        "webpack-simple-bundle"
-                    );
+                if (declaration.init.type === 'ArrayExpression' && declaration.init.elements.length !== 0) {
+                    this.generateModulesFromArrayElements(declaration.init.elements, 'webpack-simple-bundle');
+                } else if (declaration.init.type === 'ObjectExpression' && declaration.init.properties.length !== 0) {
+                    this.generateModulesFromObjectProperties(declaration.init.properties, 'webpack-simple-bundle');
                 }
             }
         }
         let runtimeBody;
         if (ast.callee.body.body.length > 2) {
             const mainBody = ast.callee.body.body.slice(-1);
-            let mainAst: Program = {
-                type: "Program",
-                body: [],
-                directives: [],
-                sourceType: "script",
-                sourceFile: "inline",
-            };
-            if (mainBody[0].type === "ReturnStatement") {
-                if (typeof mainBody[0].argument.expressions !== "undefined") {
-                    mainAst.body = [
-                        {
-                            type: "ExpressionStatement",
-                            expression: {
-                                type: "SequenceExpression",
-                                expressions: mainBody[0].argument.expressions,
-                            },
-                        },
-                    ];
+            const mainAST = this.makeFile([]);
+            if (mainBody[0].type === 'ReturnStatement') {
+                if (typeof mainBody[0].argument.expressions !== 'undefined') {
+                    mainAST.program.body = [{
+                        type: 'ExpressionStatement',
+                        expression: {
+                            type: 'SequenceExpression',
+                            expressions: mainBody[0].argument.expressions
+                        }
+                    }];
                 } else {
-                    mainAst.body = [mainBody[0].argument];
+                    mainAST.program.body = [mainBody[0].argument];
                 }
             } else {
-                mainAst.body = mainBody; // TODO: impl renameRequire for this node
+                mainAST.program.body = mainBody; // TODO: impl renameRequire for this node
             }
-            const content = generate(mainAst);
-            this.addModule("__main", content.code);
+            this.addModule('__main', mainAST);
             runtimeBody = ast.callee.body.body.slice(1, -1);
         } else if (ast.callee.body.body.length === 2) {
             runtimeBody = [ast.callee.body.body[1]];
         }
-        const runtimeAST: Program = {
-            type: "Program",
-            body: runtimeBody,
-            directives: [],
-            sourceType: "script",
-            sourceFile: "inline",
-        };
-        const runtimeContent = generate(runtimeAST);
-        this.addModule("__runtime", runtimeContent.code);
-    }
+        const runtimeAST = this.makeFile(runtimeBody);
+        this.wrapFuncWithReturnInIIFE(runtimeAST, runtimeBody.start, runtimeBody.end);
+        this.addModule('__runtime', runtimeAST);
+    };
 
     private debundleWebpackSimpleDev(ast: any): void {
         const modules = ast.body[0].declarations[0].init.properties;
-        this.generateModulesFromObjectProperties(
-            modules,
-            "webpack-simple-dev-bundle"
-        );
+        this.generateModulesFromObjectProperties(modules, 'webpack-simple-dev-bundle');
+        const runtimeBody = ast.body.slice(1, -1);
+        // TODO: impl renameRequire for this node
+        const runtimeAST = this.makeFile(runtimeBody);
+        this.wrapFuncWithReturnInIIFE(runtimeAST, runtimeBody.start, runtimeBody.end);
+        this.addModule('__runtime', runtimeAST);
+
         const mainBody = ast.body.slice(-1);
-        let mainAst = {
-            // TODO: impl renameRequire for this node
-            type: "Program",
-            body: mainBody,
-        };
-        // @ts-ignore
-        const content = generate(mainAst);
-        this.addModule("__main", content.code);
-    }
+        // TODO: impl renameRequire for this node
+        const mainAST = this.makeFile(mainBody);
+        this.addModule('__main', mainAST);
+    };
 
     private debundleWebpackRuntimePreprocessFunc(ast: any): void {
         const modules = ast.arguments[0].arguments[0].elements;
-        this.generateModulesFromArrayElements(
-            modules,
-            "webpack-runtime-preprocess-func-bundle"
-        );
+        this.generateModulesFromArrayElements(modules, 'webpack-runtime-preprocess-func-bundle');
         const mainBody = ast.callee.body.body;
-        let mainAst = {
-            // TODO: impl renameRequire for this node
-            type: "Program",
-            body: mainBody,
-        };
-        // @ts-ignore
-        const content = generate(mainAst);
-        this.addModule("__main", content.code);
+        const start = ast.callee.body.start;
+        const end = ast.callee.body.end;
+        // TODO: impl renameRequire for this node
+        const mainAST = this.makeFile(mainBody);
+        this.wrapFuncWithReturnInIIFE(mainAST, start, end);
+        this.addModule('__main', mainAST);
     }
 
     private unpackBundle(overheadNode: BundleInfo) {
         const ast = overheadNode.ast;
         const bundleClass = overheadNode.title;
-        switch (bundleClass) {
-            case "broserify-bundle": {
+        switch(bundleClass) {
+            case 'browserify-bundle': {
                 this.debundleBrowserify(ast);
                 return;
             }
-            case "webpack-runtime-bundle": {
+            case 'webpack-runtime-bundle': {
                 this.debundleWebpackRuntime(ast);
                 return;
             }
-            case "webpack-jsonp-bundle": {
+            case 'webpack-jsonp-bundle': {
                 this.debundleJsonp(ast);
                 return;
             }
-            case "webpack-jsonp-func-bundle": {
+            case 'webpack-jsonp-func-bundle': {
                 this.debundleJsonpFunc(ast);
                 return;
             }
-            case "webpack-simple-bundle":
-            case "webpack-simple-no-import-bundle": {
+            case 'webpack-simple-bundle':
+            case 'webpack-simple-no-import-bundle': {
                 this.debundleWebpackSimple(ast);
                 return;
             }
-            case "webpack-simple-dev-bundle": {
+            case 'webpack-simple-dev-bundle': {
                 this.debundleWebpackSimpleDev(ast);
                 return;
             }
-            case "webpack-runtime-preprocess-func-bundle": {
+            case 'webpack-runtime-preprocess-func-bundle': {
                 this.debundleWebpackRuntimePreprocessFunc(ast);
                 return;
             }
-            case "webpack-runtime-remote-bundle": {
+            case 'webpack-runtime-remote-bundle': {
                 // XXX: dirty hack because we have few examples of this class
                 // and don't know how the modules are located
-                let runtimeAST = {
-                    type: "FunctionDeclaration",
-                    params: [],
-                    id: {
-                        type: "Identifier",
-                        name: "__runtime",
-                    },
-                    body: ast.callee.body,
-                };
-                // @ts-ignore
-                this.addModule("__runtime", generate(runtimeAST).code);
+                const runtimeAST = this.makeFile(ast.callee.body.body);
+                this.wrapFuncWithReturnInIIFE(runtimeAST, ast.callee.body.start, ast.callee.body.end);
+                this.addModule('__runtime', runtimeAST);
                 return;
             }
+        }
+    }
+
+    private replaceNodeWithStub(node: Node, parent: Node, stub: Node) {
+        const parentVisitorKeys = VISITOR_KEYS[parent.type];
+        let found = false;
+
+        for (const fieldName of parentVisitorKeys) {
+            let field = parent[fieldName];
+            if (Array.isArray(field)) {
+                for (let i = 0; i < field.length; i++) {
+                    if (parent[fieldName][i] === node) {
+                        parent[fieldName][i] = stub;
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    break;
+                }
+            } else if (typeof field === 'object') {
+                if (parent[fieldName] === node) {
+                    parent[fieldName] = stub;
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found) {
+            throw new Error('Could not find required node in its\' parent');
         }
     }
 
     private _debundle(matchedNode: BundleInfo) {
-        traverse(this.baseAST, {
-            enter(path: any) {
-                if (path.node === matchedNode.ast) {
-                    if (path.type === "Program") {
-                        path.replaceWith(program(path.node.body.slice(1)));
-                        return;
-                    }
-                    try {
-                        path.remove();
-                    } catch {
-                        // @ts-ignore
-                        if (
-                            path.parentPath.parentPath.node.type ===
-                            "AssignmentExpression"
-                        ) {
-                            // @ts-ignore
-                            path.parentPath.parentPath.node.right =
-                                nullLiteral();
-                        } else {
-                            // @ts-ignore
-                            path.parentPath.remove();
-                        }
-                    }
-                    return;
-                }
-            },
-        });
-
-        if (typeof this.baseAST !== "undefined") {
-            this.addModule("__rest", generate(this.baseAST).code);
+        if (typeof this.baseAST === 'undefined') {
+            return;
         }
+
+        if (matchedNode.ast.type === 'CallExpression') {
+            // function(){}()
+            const stubCallExpr = callExpression(functionExpression(null, [], blockStatement([])), []);
+            // XXX: set `start` and `end` locations in case on analyzer
+            // will try to match library in CallExpression and make some
+            // checks using `start` and `and` props
+            stubCallExpr.callee.start = matchedNode.ast.start;
+            stubCallExpr.callee.end = matchedNode.ast.start + 'function(){}'.length;
+            this.replaceNodeWithStub(matchedNode.ast, matchedNode.parent, stubCallExpr);
+        } else if (matchedNode.ast.type === 'ExpressionStatement') {
+            // stub()
+            const stubExpr = expressionStatement(callExpression(identifier("stub"), []));
+            this.replaceNodeWithStub(matchedNode.ast, matchedNode.parent, stubExpr);
+        } else if (matchedNode.ast.type === 'VariableDeclaration') {
+            // const stub = null
+            const stubVarDecr = variableDeclaration("const", [variableDeclarator(identifier('stub'), nullLiteral())]);
+            this.replaceNodeWithStub(matchedNode.ast, matchedNode.parent, stubVarDecr);
+        } else if (matchedNode.ast.type === 'BlockStatement') {
+            const stubBlockStmnt = blockStatement([]);
+            this.replaceNodeWithStub(matchedNode.ast, matchedNode.parent, stubBlockStmnt);
+        } else {
+            throw new Error('Unexpected node type while trying to find matched node');
+        }
+
+        this.addModule('__rest', this.baseAST);
         this.unpackBundle(matchedNode);
     }
 
-    debundle(sourceCode: string, resourceName: string): boolean {
+    debundle(scriptNode: Node, resourceName: string): boolean {
+        this.baseAST = scriptNode;
         this.result.modules = new Map();
-        try {
-            this.baseAST = parse(sourceCode, this.parserOpts);
-        } catch (e) {
-            if (this.verbose) {
-                log(`error occured while parsing script: ${e}`);
-            }
-            return false;
-        }
         const boundaries = new Boundaries();
         for (const signature of this.bundleSignatures) {
             for (const check of signature.checks) {
                 // @ts-ignore
-                for (const result of this.astMatcher.match(
-                    check,
-                    this.baseAST,
-                    signature.$depth,
-                    signature.$length
-                )) {
+                for (const result of this.astMatcher.match(check, this.baseAST, signature.$depth, signature.$length, signature.$maxTraverseDepth)) {
                     if (!result) {
                         continue;
                     }
@@ -531,18 +453,17 @@ export class Debundler {
                     const bundleInfo: BundleInfo = {
                         ast: bundleNode,
                         title: signature.title,
+                        parent: this.astMatcher.nodesParents.get(bundleNode)
                     };
                     boundaries.set(bundleBoundary, bundleInfo);
-                    log(
-                        `matched bundle ${signature.title} at ${bundleBoundary} in ${resourceName}`
-                    );
+                    log(`matched bundle ${signature.title} at ${bundleBoundary} in ${resourceName}`);
                 }
             }
         }
 
         if (boundaries.isNotEmpty()) {
             const matchedNode = boundaries.getCurrentOverHeadNode();
-            if (typeof matchedNode === "undefined") {
+            if (typeof matchedNode === 'undefined') {
                 return false;
             }
             this.result.curBundleClass = matchedNode.title;
@@ -553,20 +474,31 @@ export class Debundler {
         return false;
     }
 
-    runCallBackOnEachModule(cb: moduleCallback): void {
-        this.result.modules.forEach((module: string, name: string) => {
-            const newModule = cb(name, module);
+    runCallBackOnEachModule(cb: moduleCallback, renameRequire=false): void {
+        this.result.modules.forEach((module: Node, name: string) => {
+            if (renameRequire) {
+                const bundleClass = this.result.nameToBundleClass.get(name);
+                if (typeof bundleClass !== 'undefined') {
+                    module = Debundler.renameRequire(module, bundleClass, true);
+                }
+            }
+            const content = generate(module);
+            const newModule = cb(name, content.code);
             if (newModule !== null) {
-                this.result.modules.set(name, newModule);
+                this.result.modules.set(name, parse(newModule));
             }
         });
     }
 
-    getModules(): Map<string, string> {
+    getModules(): Map<string, Node> {
         return this.result.modules;
     }
 
     getCurBundleClass(): string {
         return this.result.curBundleClass;
+    }
+
+    getBundleClassByName(name: string): string | undefined {
+        return this.result.nameToBundleClass.get(name);
     }
 }

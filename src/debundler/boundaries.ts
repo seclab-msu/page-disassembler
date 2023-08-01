@@ -1,7 +1,8 @@
 export interface BundleInfo {
     ast: any;
     title: string;
-}
+    parent: any;
+};
 
 export class Boundaries {
     private boundaries: Map<any, BundleInfo>;
@@ -20,7 +21,7 @@ export class Boundaries {
 
     // FIXME: after each run of debundler AST will be transformed.
     // It's bad idea to iterate over the boundaries from first initialization.
-    *overHeadNodes(): IterableIterator<BundleInfo | undefined> {
+    *overHeadNodes(): IterableIterator<BundleInfo | undefined > {
         while (this.isNotEmpty()) {
             yield this.getCurrentOverHeadNode();
         }
@@ -34,9 +35,9 @@ export class Boundaries {
             }
         }
 
-        const node = this.boundaries.get(overheadNodeKey);
+        const bundleInfo = this.boundaries.get(overheadNodeKey);
         this.boundaries.delete(overheadNodeKey);
 
-        return node;
+        return bundleInfo;
     }
-}
+};

@@ -74,5 +74,6 @@
   "output": {
     "code": "{$0}",
     "message": "resource.tagged.axios-lib-sign"
-  }
+  },
+  "$maxTraverseDepth": 5
 }

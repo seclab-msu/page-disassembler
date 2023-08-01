@@ -4,51 +4,42 @@
   "desc": "",
   "checks": [
     {
-    "type": "Program",
-    "body": [
-      {
-        "$in": [
+      "type": "ExpressionStatement",
+      "expression": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": {"$wildcard": "webpackJsonp*"}
+        },
+        "arguments": [
           {
-            "type": "ExpressionStatement",
-            "expression": {
-              "type": "CallExpression",
-              "callee": {
-                "type": "Identifier",
-                "name": {"$wildcard": "webpackJsonp*"}
-              },
-              "arguments": [
-                {
-                  "type": "ArrayExpression"
-                },
-                {
-                  "type": { "$in": ["ObjectExpression", "ArrayExpression"] }
-                }
-              ]
-            }
+            "type": "ArrayExpression"
           },
           {
-            "type": "VariableDeclaration",
-            "declarations": [{
-              "type": "VariableDeclarator",
-              "init": {
-                "type": "CallExpression",
-                "callee": {
-                  "name": {"$wildcard": "webpackJsonp*"}
-                },
-                "arguments": [
-                  {
-                    "type": "ArrayExpression"
-                  },
-                  {
-                    "type": { "$in": ["ObjectExpression", "ArrayExpression"] }
-                  }
-                ]
-              }
-            }]
+            "type": { "$in": ["ObjectExpression", "ArrayExpression"] }
           }
         ]
-      }],
-      "$break": true
+      }
+    },
+    {
+      "type": "VariableDeclaration",
+      "declarations": [{
+        "type": "VariableDeclarator",
+        "init": {
+          "type": "CallExpression",
+          "callee": {
+            "name": {"$wildcard": "webpackJsonp*"}
+          },
+          "arguments": [
+            {
+              "type": "ArrayExpression"
+            },
+            {
+              "type": { "$in": ["ObjectExpression", "ArrayExpression"] }
+            }
+          ]
+        }
+      }]
     }
   ],
   "$depth": 0,
@@ -56,5 +47,6 @@
   "output": {
     "code": "{$0}",
     "message": "resource.tagged.axios-lib-sign"
-  }
+  },
+  "$maxTraverseDepth": 2
 }

@@ -185,5 +185,6 @@
     "output": {
         "code": "{$0}",
         "message": "resource.tagged.jquery-lib-sign"
-    }
+    },
+    "$maxTraverseDepth": 4
 }

@@ -1,5 +1,5 @@
 {
-  "title": "broserify-bundle",
+  "title": "browserify-bundle",
   "type": "ast",
   "desc": "",
   "checks": [
@@ -124,5 +124,6 @@
   "output": {
     "code": "{$0}",
     "message": "resource.tagged.jquery-lib-sign"
-  }
+  },
+  "$maxTraverseDepth": 14
 }
